@@ -3,3 +3,5 @@
 .browser-controls{display:flex;gap:8px;margin-top:20px}#web-status{font-size:12px;line-height:1.8;margin:20px 0}#web{margin-bottom:12px}
 
 .learning-summary{margin:20px 48px;padding:16px;border:1px solid #dce1d6;border-radius:8px}button:disabled{opacity:.5;cursor:wait}
+
+.generation-status{margin:16px 0;padding:14px 16px;background:#e4ecdf;border:1px solid #c8d8be;border-radius:8px;font-size:13px;line-height:1.7;overflow-wrap:anywhere}.generation-status.error{background:#fff0eb;border-color:#e6b9a8;color:#973f29}.generation-status[hidden]{display:none}
