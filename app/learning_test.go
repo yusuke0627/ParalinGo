@@ -1,76 +1,67 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestGenerateLearning(t *testing.T) {
-	sentences := []string{"Small steps make a difference."}
-	result := LearningResult{Translations: []string{"小さな一歩が違いを生みます。"}, Chunks: []Chunk{{Text: "make a difference", Meaning: "違いを生む", Explanation: "変化をもたらすこと", Sentence: 0}}, SummaryEN: "Small steps matter.", SummaryJA: "小さな一歩が大切です。"}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer test-only" {
-			t.Errorf("unexpected request")
+func TestPlanStream(t *testing.T) {
+	raw := `data: {"type":"response.output_text.delta","delta":"hello"}
+
+data: {"type":"response.completed","response":{"status":"completed"}}
+
+`
+	got, err := readPlanStream(strings.NewReader(raw))
+	if err != nil || got != "hello" {
+		t.Fatalf("%q %v", got, err)
+	}
+	for _, raw := range []string{`data: {"type":"response.output_text.delta","delta":"partial"}
+
+`, `data: {"type":"response.failed"}
+
+`, `data: {"type":"response.incomplete"}
+
+`} {
+		if _, err := readPlanStream(strings.NewReader(raw)); err == nil {
+			t.Fatal("accepted incomplete output")
 		}
-		var input struct {
-			Messages []map[string]string `json:"messages"`
-		}
-		if json.NewDecoder(r.Body).Decode(&input) != nil || len(input.Messages) != 2 {
-			t.Error("missing prompt")
-		}
-		content, _ := json.Marshal(result)
-		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": string(content)}, "finish_reason": "stop"}}})
-	}))
-	defer server.Close()
-	l := &Learning{}
-	if err := l.Configure(AISettings{Endpoint: server.URL + "/v1", Model: "mock", APIKey: "test-only"}); err != nil {
+	}
+}
+func TestLoginCallback(t *testing.T) {
+	a := &loginAttempt{state: "expected", expires: time.Now().Add(time.Minute)}
+	q := url.Values{"state": {"expected"}, "code": {"code"}, "client_id": {"oaiapp_test"}}
+	if _, err := validateCallback(a, q); err != nil {
 		t.Fatal(err)
 	}
-	got, err := l.Generate(sentences, "TOEIC 600")
-	if err != nil {
-		t.Fatal(err)
+	q.Set("state", "wrong")
+	if _, err := validateCallback(a, q); err == nil {
+		t.Fatal("accepted invalid state")
 	}
-	if got.Translations[0] != result.Translations[0] {
-		t.Fatal("translation lost")
+	q.Set("state", "expected")
+	a.client = "oaiapp_other"
+	if _, err := validateCallback(a, q); err == nil {
+		t.Fatal("accepted changed client")
 	}
-	result.Chunks[0].Text = "invented phrase"
-	if _, err = l.Generate(sentences, "TOEIC 600"); err == nil {
-		t.Fatal("accepted hallucinated chunk")
+}
+func TestLearningValidation(t *testing.T) {
+	input := []string{"Small steps make a difference."}
+	result := LearningResult{Translations: []string{"小さな一歩が違いを生みます。"}, SummaryEN: "Small steps matter.", SummaryJA: "小さな一歩が大切です。", Chunks: []Chunk{{Text: "invented", Meaning: "意味", Explanation: "解説", Sentence: 0}}}
+	if validateLearning(result, input) == nil {
+		t.Fatal("accepted invented phrase")
 	}
 	result.Chunks = nil
+	if err := validateLearning(result, input); err != nil {
+		t.Fatal(err)
+	}
 	result.Translations = nil
-	if _, err = l.Generate(sentences, "TOEIC 600"); err == nil {
-		t.Fatal("accepted missing translation")
+	if validateLearning(result, input) == nil {
+		t.Fatal("accepted wrong count")
 	}
 }
-func TestAIEndpointAndUnconfigured(t *testing.T) {
-	l := &Learning{}
-	if _, err := l.Generate([]string{"Hello."}, ""); err == nil {
-		t.Fatal("missing configuration accepted")
-	}
-	for _, endpoint := range []string{"http://example.org/v1", "https://user:secret@example.org/v1", "javascript:alert(1)", "https://example.org/v1?key=secret"} {
-		if l.Configure(AISettings{Endpoint: endpoint, Model: "test"}) == nil {
-			t.Errorf("accepted %q", endpoint)
-		}
-	}
-}
-
-func TestAIErrorMessages(t *testing.T) {
-	for _, tc := range []struct{ body, want string }{
-		{`{"error":{"code":"credit_balance_exhausted","type":"insufficient_quota"}}`, "クレジット残高"},
-		{`{"error":{"code":"rate_limit_exceeded"}}`, "一時的"},
-		{`{"error":{"code":"project_spend_limit_exceeded"}}`, "支出上限"},
-		{`{"error":{"code":"insufficient_quota"}}`, "利用枠"},
-		{`{"error":{"message":"secret-provider-content"}}`, "利用枠またはレート制限"},
-	} {
-		response := &http.Response{StatusCode: 429, Body: io.NopCloser(strings.NewReader(tc.body))}
-		got := describeAIError(response).Error()
-		if !strings.Contains(got, tc.want) || strings.Contains(got, "secret-provider-content") {
-			t.Errorf("unexpected error: %s", got)
-		}
+func TestPlanScope(t *testing.T) {
+	if hasPlanScope("openid profile") || !hasPlanScope("openid chatgpt.tokens.use.direct") {
+		t.Fatal("invalid scope check")
 	}
 }

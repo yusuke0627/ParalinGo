@@ -4,10 +4,12 @@ import { call } from "mygo-runtime";
 
 // ---- Types ----
 
-export interface AISettings {
-  endpoint: string;
+export interface ChatGPTStatus {
+  connected: boolean;
+  pending: boolean;
+  email: string;
   model: string;
-  apiKey: string;
+  message: string;
 }
 
 export interface Chunk {
@@ -22,6 +24,12 @@ export interface LearningResult {
   chunks: Chunk[];
   summaryEN: string;
   summaryJA: string;
+}
+
+export interface PlanModel {
+  slug: string;
+  display_name: string;
+  visibility: string;
 }
 
 export interface WebArticle {
@@ -55,10 +63,28 @@ export const Browser = {
   },
 } as const;
 
-export const Learning = {
-  configure(s: AISettings): Promise<void> {
-    return call("Learning.Configure", s);
+export const ChatGPT = {
+  cancelLogin(): Promise<void> {
+    return call("ChatGPT.CancelLogin");
   },
+  login(): Promise<void> {
+    return call("ChatGPT.Login");
+  },
+  logout(): Promise<string> {
+    return call("ChatGPT.Logout");
+  },
+  models(): Promise<PlanModel[]> {
+    return call("ChatGPT.Models");
+  },
+  selectModel(slug: string): Promise<void> {
+    return call("ChatGPT.SelectModel", slug);
+  },
+  status(): Promise<ChatGPTStatus> {
+    return call("ChatGPT.Status");
+  },
+} as const;
+
+export const Learning = {
   generate(sentences: string[], level: string): Promise<LearningResult> {
     return call("Learning.Generate", sentences, level);
   },

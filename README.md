@@ -48,10 +48,20 @@ MyGO評価記録は `docs/mygo-evaluation.md` に残します。
 
 戻る・進む・再読込はURLダイアログから利用できます。本文抽出は `article` / `main` の段落を優先する初期実装です。サイトによってメニューの混入や本文の取りこぼしがあるため、保存前に編集してください。iframe内の本文、段落タグを使わないサイト、別窓リンクは未対応です。Webプレビューでは利用できません。
 
-## AI生成
+## ChatGPTプランで生成
 
-「AI接続設定」でChat Completions互換APIのベースURL（例 `https://api.openai.com/v1`）、利用可能なモデルID、APIキーを設定します。JSONモード対応モデルが必要です。HTTPSかローカルHTTPを利用できます。設定とキーはGoのメモリだけで保持し、再起動で消えます。キーを記事・JSONバックアップ・Gitに保存しません。
+1. デスクトップ版の「ChatGPT接続」を開く。
+2. 「Continue with ChatGPT」を押し、システムブラウザの公式画面でログインとプラン利用の許可を行う。
+3. ChatGPT側の利用設定でParalinGoの追加クレジット利用を無効にする。プラン連携はクレジット利用も提供するため、サブスクのみの予算管理はChatGPT側で設定する。
+4. アプリへ戻り「モデル一覧を取得」、利用可能なモデルを選ぶ。
+5. 記事で「対訳・解説を生成」を押す。
 
-「対訳・解説を生成」で送信先を確認して生成します。記事の英文と学習目標を送信し、文順を保った日本語訳、原文に対応する表現解説、日英サマリを保存します。既存の訳は成功時に置き換わります。1回80文・24000文字まで。生成失敗時は既存データを保ちます。モデル出力は学習補助として確認してください。実APIの品質とモデル別互換性は未検証です。
+APIキーの入力と従量課金APIへのフォールバックはありません。上限・認証エラー時は停止します。生成結果の保存形式は以前と同じです。
 
-API仕様参考: https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat
+OAuthはPKCE、state、nonce、署名・issuer・audience・期限を検証。認証トークンはGoのメモリ内で保持し、再起動時は再ログインします。ホストIDとクライアント登録情報だけをOS設定フォルダの `ParalinGo/chatgpt-registration.json` に保存します。ログアウトは公式のセッション失効も試み、確認できない場合はChatGPT設定から解除する案内を表示します。
+
+対象プランと実アカウントでの提供状況は公式ログイン後に確認が必要です。署名付きログイン・実生成はユーザーの許可後に実機確認する必要があります。
+
+- https://developers.openai.com/siwc/token-sharing-open-source/sign-in
+- https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference
+- https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
