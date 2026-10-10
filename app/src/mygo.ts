@@ -2,6 +2,14 @@
 
 import { call } from "mygo-runtime";
 
+// ---- Types ----
+
+export interface WebArticle {
+  title: string;
+  source: string;
+  paragraphs: string[];
+}
+
 // ---- Services ----
 
 /** Library persists the reader state on the desktop, outside the app bundle. */
@@ -11,5 +19,18 @@ export const Library = {
   },
   save(data: string): Promise<void> {
     return call("Library.Save", data);
+  },
+} as const;
+
+/** Browser owns an isolated external-page window. External origins cannot call Go services. */
+export const Browser = {
+  capture(): Promise<WebArticle> {
+    return call("Browser.Capture");
+  },
+  navigate(action: string): Promise<void> {
+    return call("Browser.Navigate", action);
+  },
+  open(raw: string): Promise<void> {
+    return call("Browser.Open", raw);
   },
 } as const;
