@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -53,6 +55,22 @@ func TestAIEndpointAndUnconfigured(t *testing.T) {
 	for _, endpoint := range []string{"http://example.org/v1", "https://user:secret@example.org/v1", "javascript:alert(1)", "https://example.org/v1?key=secret"} {
 		if l.Configure(AISettings{Endpoint: endpoint, Model: "test"}) == nil {
 			t.Errorf("accepted %q", endpoint)
+		}
+	}
+}
+
+func TestAIErrorMessages(t *testing.T) {
+	for _, tc := range []struct{ body, want string }{
+		{`{"error":{"code":"credit_balance_exhausted","type":"insufficient_quota"}}`, "クレジット残高"},
+		{`{"error":{"code":"rate_limit_exceeded"}}`, "一時的"},
+		{`{"error":{"code":"project_spend_limit_exceeded"}}`, "支出上限"},
+		{`{"error":{"code":"insufficient_quota"}}`, "利用枠"},
+		{`{"error":{"message":"secret-provider-content"}}`, "利用枠またはレート制限"},
+	} {
+		response := &http.Response{StatusCode: 429, Body: io.NopCloser(strings.NewReader(tc.body))}
+		got := describeAIError(response).Error()
+		if !strings.Contains(got, tc.want) || strings.Contains(got, "secret-provider-content") {
+			t.Errorf("unexpected error: %s", got)
 		}
 	}
 }

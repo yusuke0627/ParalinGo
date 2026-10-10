@@ -103,7 +103,7 @@ func (l *Learning) Generate(sentences []string, level string) (LearningResult, e
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		return LearningResult{}, fmt.Errorf("AI接続エラー (HTTP %d)。キー・モデル・JSONモード対応を確認してください", response.StatusCode)
+		return LearningResult{}, describeAIError(response)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 2*1024*1024+1))
 	if err != nil || len(data) > 2*1024*1024 {
@@ -128,4 +128,40 @@ func (l *Learning) Generate(sentences []string, level string) (LearningResult, e
 		return LearningResult{}, err
 	}
 	return result, nil
+}
+
+// describeAIError uses provider codes without displaying raw response bodies or credentials.
+func describeAIError(response *http.Response) error {
+	var payload struct {
+		Error struct {
+			Code string `json:"code"`
+			Type string `json:"type"`
+		} `json:"error"`
+	}
+	_ = json.NewDecoder(io.LimitReader(response.Body, 65536)).Decode(&payload)
+	message := "AI接続に失敗しました。接続先とモデルの設定を確認してください"
+	switch payload.Error.Code {
+	case "credit_balance_exhausted":
+		message = "OpenAI APIのクレジット残高がありません。OpenAI PlatformのBillingで残高を追加してから再試行してください"
+	case "organization_spend_limit_exceeded", "project_spend_limit_exceeded":
+		message = "APIの支出上限に達しています。OpenAI Platformで組織・プロジェクトの上限を確認してください"
+	case "organization_usage_limit_exceeded":
+		message = "組織のAPI利用上限に達しています。OpenAI Platformの利用上限を確認してください"
+	case "rate_limit_exceeded", "slow_down":
+		message = "一時的なAPIレート制限です。少し待ってから再試行してください"
+	default:
+		switch {
+		case payload.Error.Type == "insufficient_quota" || payload.Error.Code == "insufficient_quota":
+			message = "APIの利用枠が不足しています。OpenAI PlatformのBillingと利用上限を確認してください"
+		case response.StatusCode == 429:
+			message = "APIの利用枠またはレート制限です。Billingと利用上限を確認してください"
+		case response.StatusCode == 401:
+			message = "APIキーが無効、失効済み、または未設定です。AI接続設定を確認してください"
+		case response.StatusCode == 403:
+			message = "APIのアクセス権限がありません。キーとプロジェクトの権限を確認してください"
+		case response.StatusCode >= 500:
+			message = "AIサービス側でエラーが発生しています。時間を置いて再試行してください"
+		}
+	}
+	return fmt.Errorf("%s (HTTP %d)", message, response.StatusCode)
 }
