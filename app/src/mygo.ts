@@ -4,6 +4,26 @@ import { call } from "mygo-runtime";
 
 // ---- Types ----
 
+export interface AISettings {
+  endpoint: string;
+  model: string;
+  apiKey: string;
+}
+
+export interface Chunk {
+  text: string;
+  meaning: string;
+  explanation: string;
+  sentence: number;
+}
+
+export interface LearningResult {
+  translations: string[];
+  chunks: Chunk[];
+  summaryEN: string;
+  summaryJA: string;
+}
+
 export interface WebArticle {
   title: string;
   source: string;
@@ -32,5 +52,14 @@ export const Browser = {
   },
   open(raw: string): Promise<void> {
     return call("Browser.Open", raw);
+  },
+} as const;
+
+export const Learning = {
+  configure(s: AISettings): Promise<void> {
+    return call("Learning.Configure", s);
+  },
+  generate(sentences: string[], level: string): Promise<LearningResult> {
+    return call("Learning.Generate", sentences, level);
   },
 } as const;

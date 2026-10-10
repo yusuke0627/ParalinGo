@@ -70,6 +70,7 @@ func (l *Library) Save(data string) error {
 func main() {
 	mygo.Bind(&Library{})
 	mygo.Bind(&Browser{})
+	mygo.Bind(&Learning{})
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{Title: "ParalinGo", Width: 1280, Height: 850, MinWidth: 800, MinHeight: 600, BackgroundColor: "#f6f5f0", StateKey: "main", URL: "/"})
 	})
